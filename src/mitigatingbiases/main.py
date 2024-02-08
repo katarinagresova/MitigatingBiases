@@ -70,7 +70,7 @@ def main(background_fasta, motif_fasta, output_directory) -> None:
 
     plot_functions(background_counts, motif_counts, output_directory)
 
-    output_statistics(background_counts, motif_counts)
+    output_statistics(background_counts, motif_counts, output_directory)
 
 
 if __name__ == '__main__':
