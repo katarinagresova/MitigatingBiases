@@ -1,77 +1,78 @@
-from os import path
+from counting import do_counting
+from plotting.plotting import plot_per_base_sequence_content, plot_per_base_sequence_comparison, plot_composition_comparison, plot_composition_comparison_boxplot, plot_lenght_comparison
 
-import click
-import pandas as pd
-#from Bio import SeqIO as IO
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 from Bio import SeqIO
 
-from counting import count_nucleotides, get_nucleotides_per_position
-from plotting import plot_functions
-
-FASTA_FORMATS = ['.fasta', '.fas', '.fa', '.fna', '.ffn', '.faa', '.mpfa', '.frn']
-
-
-def check_fasta(fasta_file):
-    if not path.isfile(fasta_file) and path.splitext(fasta_file) not in FASTA_FORMATS:
-        raise ValueError(f'Not a valid fasta format. Accepted: {",".join(FASTA_FORMATS)}')
-    return True
-
-from statistics.statistics import output_statistics
-
-def fasta_generator(file_path):
-    # Function to read a FASTA file and return sequences as a generator
-    with open(file_path, 'r') as file:
-        sequence = ''
-        for line in file:
-            if line.startswith('>'):
-                if sequence:
-                    yield sequence
-                    sequence = ''
-            else:
-                sequence += line.strip()
-        if sequence:
-            yield sequence
-
-@click.command()
-@click.option('-b', '--background_fasta', type=str, help='The fasta file containing the background'
-                                                         ' sequences to be parsed and included', prompt=True)
-@click.option('-m', '--motif_fasta', type=str, help='The fasta file containing the'
-                                                    ' motifs to be parsed and included', prompt=True)
-@click.option('-o', '--output_directory', help='The output directory for the results', prompt=True)
-def main(background_fasta, motif_fasta, output_directory) -> None:
+def parse_fasta(filename):
     """
-    The main function which will action the pipeline
-    :param background_fasta: the background fasta file
-    :param motif_fasta: the motifs fasta file
-    :param output_directory: the output directory holding the results
-    :return: None
+    Parses a fasta file and returns a generator of SeqIO objects
     """
-    # add a check that the args are fasta
-    if not (check_fasta(motif_fasta) and check_fasta(background_fasta)):
-        raise ValueError('Not a valid format')
-    #background_seq = IO.to_dict(IO.parse(background_fasta, "fasta"))
-    background_seq = fasta_generator(background_fasta)
-    #motif_seq = IO.to_dict(IO.parse(motif_fasta, "fasta"))
-    motif_seq = fasta_generator(motif_fasta)
-    click.echo('Parsed background and motif files')
-    background_counts = pd.DataFrame([count_nucleotides(value) for value in background_seq])
-    backgroun_count_per_position = pd.DataFrame(get_nucleotides_per_position(fasta_generator(background_fasta)))
-    motif_counts = pd.DataFrame([count_nucleotides(value) for value in motif_seq])
-    click.echo(f'Generated Counts. logging counts in {output_directory}')
 
-    # check if the output directory exists, if not create it
-    if not path.exists(output_directory):
-        from os import makedirs
-        makedirs(output_directory)
-
-    motif_counts.to_csv(path.join(output_directory, 'motif_counts.csv'), header=True)
-    background_counts.to_csv(path.join(output_directory, 'background_counts.csv'), header=True)
-    backgroun_count_per_position.to_csv(path.join(output_directory, 'background_counts_per_position.csv'), header=True)
-
-    plot_functions(background_counts, motif_counts, output_directory)
-
-    output_statistics(background_counts, motif_counts, output_directory)
+    with open(filename, "r") as handle:
+        for record in SeqIO.parse(handle, "fasta"):
+            yield record.seq
 
 
-if __name__ == '__main__':
+def main():
+    pos_seq = parse_fasta("/home/jovyan/MitigatingBiases/data/pos.fasta")
+    neg_seq = parse_fasta("/home/jovyan/MitigatingBiases/data/neg.fasta")
+
+    pos_nucleotides_df, pos_dinucleotides_df, pos_nucleotides_per_position_df, pos_nucleotides_per_position_reversed_df = do_counting(pos_seq)
+    neg_nucleotides_df, neg_dinucleotides_df, neg_nucleotides_per_position_df, neg_nucleotides_per_position_reversed_df = do_counting(neg_seq)
+
+    plots = []
+
+    # Plot nucleotides
+    fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(10, 8))
+    plot_composition_comparison(pos_nucleotides_df, neg_nucleotides_df, x_label='Position in read (bp)', ax=ax)
+    fig.suptitle('Nucleotide composition')
+    plots.append(fig)
+
+    # Plot dinucleotides
+    fig, ax = plt.subplots(nrows=16, ncols=1, figsize=(10, 32))
+    plot_composition_comparison(pos_dinucleotides_df, neg_dinucleotides_df, x_label='Position in read (bp)', ax=ax)
+    fig.suptitle('Dinucleotide composition')
+    plots.append(fig)
+
+    # Plot nucleotides per position
+    fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(10, 8))
+    plot_per_base_sequence_comparison(
+        pos_nucleotides_per_position_df, 
+        neg_nucleotides_per_position_df, 
+        end_position=100,  
+        x_label='Position in read (bp)',
+        ax=ax,
+        stats=True)
+    fig.suptitle('Nucleotide per position')
+    plots.append(fig)
+
+    # Plot nucleotides per position reversed
+    fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(10, 8))
+    plot_per_base_sequence_comparison(
+        pos_nucleotides_per_position_reversed_df, 
+        neg_nucleotides_per_position_reversed_df, 
+        end_position=100, 
+        x_label='Position in read (bp)',
+        ax=ax,
+        stats=True)
+    fig.suptitle('Nucleotide per position reversed')
+    plots.append(fig)
+
+    # Plot length distribution
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 3))
+    plot_lenght_comparison(
+        pos_nucleotides_df, 
+        neg_nucleotides_df, 
+        x_label='Sequence length', 
+        ax=ax)
+    fig.suptitle('Length distribution')
+    plots.append(fig)
+
+    with PdfPages('output.pdf') as pdf:
+        for fig in plots:
+            pdf.savefig(fig, bbox_inches='tight') 
+
+if __name__ == "__main__":
     main()
