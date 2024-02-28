@@ -22,13 +22,14 @@ def plot_per_base_sequence_content(df, end_position, title='', ax=None):
 
     return ax
 
-def plot_per_base_sequence_comparison(pos_df, neg_df, end_position, title='', x_label='', ax=None, stats=False):
+def plot_per_base_sequence_comparison(pos_df, neg_df, end_position, title='', x_label='', ax=None, stats=False, p_value_thresh=0.01):
 
     bases = pos_df.columns[:-1].values
 
     if ax is None:
         fig, ax = plt.subplots(nrows=len(bases), ncols=1, figsize=(15, 3 * len(bases)), sharex=True, sharey=True)
 
+    stats_passed = True
     for index, base in enumerate(bases):
 
         pos_freq = pos_df[base][:end_position] / pos_df['sum'][:end_position]
@@ -48,7 +49,8 @@ def plot_per_base_sequence_comparison(pos_df, neg_df, end_position, title='', x_
                     [neg_freq[i] * 100, (1 - neg_freq[i]) * 100]]
             
                 _, p_value = fisher_exact(table=table) 
-                if p_value < 0.05:
+                if p_value < p_value_thresh:
+                    stats_passed = False
                     ax[index].plot(i, p_value, 'ro',)
 
                     # plot salmon background on position with p-value < 0.05
@@ -59,15 +61,20 @@ def plot_per_base_sequence_comparison(pos_df, neg_df, end_position, title='', x_
 
     ax[index].set_xlabel(x_label)
 
-    return ax
+    return ax, stats_passed
 
-def plot_composition_comparison(pos_df, neg_df, title='', x_label='', ax=None):
+def plot_composition_comparison(pos_df, neg_df, title='', x_label='', ax=None, stats=False, p_value_thresh=0.01):
 
-    bases = pos_df.columns[:-1].values
+    # get bcolumns names
+    bases = pos_df.columns.values
+    # remove sum from bases (it doesn't have to be the last value)
+    bases = bases[bases != 'sum']
+
 
     if ax is None:
         fig, ax = plt.subplots(nrows=len(bases), ncols=1, figsize=(10, 2*len(bases)))
 
+    stats_passed = True
     for index, base in enumerate(bases):
 
         pos_freq = pos_df[base] / pos_df['sum']
@@ -76,30 +83,32 @@ def plot_composition_comparison(pos_df, neg_df, title='', x_label='', ax=None):
         sns.histplot(pos_freq, ax=ax[index], label='positive', kde=True, alpha=0.3)
         sns.histplot(neg_freq, ax=ax[index], label='negative', kde=True, alpha=0.3)
 
-        _, p_value = ranksums(pos_freq, neg_freq)
-        if p_value < 0.05:
-            ax[index].text(0.9, max( pos_df['sum'])/10, f"p-value: {p_value:.2e}", ha='center')
-            
-            # set frame to gray and width to 2
-            ax[index].spines['bottom'].set_color('red')
-            ax[index].spines['top'].set_color('red')
-            ax[index].spines['right'].set_color('red')
-            ax[index].spines['left'].set_color('red')
-            ax[index].spines['bottom'].set_linewidth(2)
-            ax[index].spines['top'].set_linewidth(2)
-            ax[index].spines['right'].set_linewidth(2)
-            ax[index].spines['left'].set_linewidth(2)
+        if stats:
+            _, p_value = ranksums(pos_freq, neg_freq)
+            if p_value < p_value_thresh:
+                stats_passed = False
+                ax[index].text(0.9, max( pos_df['sum'])/10, f"p-value: {p_value:.2e}", ha='center')
+                
+                # set frame to gray and width to 2
+                ax[index].spines['bottom'].set_color('red')
+                ax[index].spines['top'].set_color('red')
+                ax[index].spines['right'].set_color('red')
+                ax[index].spines['left'].set_color('red')
+                ax[index].spines['bottom'].set_linewidth(2)
+                ax[index].spines['top'].set_linewidth(2)
+                ax[index].spines['right'].set_linewidth(2)
+                ax[index].spines['left'].set_linewidth(2)
 
         ax[index].set_xlim(0, 1)
         ax[index].set_ylabel('Count')
         ax[index].legend()
         ax[index].set_title(f'Base: {base}')
 
-    ax[index].set_xlabel('Frequency')
+    ax[index].set_xlabel(x_label)
 
-    return ax
+    return ax, stats_passed
 
-def plot_composition_comparison_boxplot(pos_df, neg_df, title='', x_label='', ax=None):
+def plot_composition_comparison_boxplot(pos_df, neg_df, title='', x_label='', ax=None, stats=False, p_value_thresh=0.01):
 
     bases = pos_df.columns[:-1].values
 
@@ -124,7 +133,7 @@ def plot_composition_comparison_boxplot(pos_df, neg_df, title='', x_label='', ax
         neg_freq = neg_df[base] / neg_df['sum']
 
         _, p_value = ranksums(pos_freq, neg_freq)
-        if p_value < 0.05:
+        if p_value < p_value_thresh:
             # plot p-value on top of the boxplot
             index = list(bases).index(base)
             ax.text(index, -0.15, f"p-value: {p_value:.2e}", ha='center')
@@ -138,7 +147,7 @@ def plot_composition_comparison_boxplot(pos_df, neg_df, title='', x_label='', ax
 
     return ax
 
-def plot_lenght_comparison(pos_df, neg_df, title='', x_label='', ax=None):
+def plot_lenght_comparison(pos_df, neg_df, title='', x_label='', ax=None, stats=False, p_value_thresh=0.01):
 
     if ax is None:
         fig, ax = plt.subplots(1, ncols=1, figsize=(10, 2))
@@ -151,25 +160,27 @@ def plot_lenght_comparison(pos_df, neg_df, title='', x_label='', ax=None):
     sns.histplot(pos_freq, ax=ax, label='positive', kde=True, alpha=0.2, bins=20)
     sns.histplot(neg_freq, ax=ax, label='negative', kde=True, alpha=0.2, bins=20)
 
-    _, p_value = ranksums(pos_freq, neg_freq)
-    if p_value < 0.05:
-        ax.text(0.9, 0.1, f"p-value: {p_value:.2e}", ha='center', transform=ax.transAxes)
-        
-        # set frame to gray and width to 2
-        ax.spines['bottom'].set_color('salmon')
-        ax.spines['top'].set_color('salmon')
-        ax.spines['right'].set_color('salmon')
-        ax.spines['left'].set_color('salmon')
-        ax.spines['bottom'].set_linewidth(2)
-        ax.spines['top'].set_linewidth(2)
-        ax.spines['right'].set_linewidth(2)
-        ax.spines['left'].set_linewidth(2)
+    stats_passed = True
+    if stats:
+        _, p_value = ranksums(pos_freq, neg_freq)
+        if p_value < p_value_thresh:
+            stats_passed = False
+            ax.text(0.9, 0.1, f"p-value: {p_value:.2e}", ha='center', transform=ax.transAxes)
+            
+            # set frame to gray and width to 2
+            ax.spines['bottom'].set_color('salmon')
+            ax.spines['top'].set_color('salmon')
+            ax.spines['right'].set_color('salmon')
+            ax.spines['left'].set_color('salmon')
+            ax.spines['bottom'].set_linewidth(2)
+            ax.spines['top'].set_linewidth(2)
+            ax.spines['right'].set_linewidth(2)
+            ax.spines['left'].set_linewidth(2)
 
     #ax.set_xlim(0, 1)
     ax.set_ylabel('Count')
     ax.legend()
-    ax.set_title(f'Base: {base}')
 
     ax.set_xlabel('Length')
 
-    return ax
+    return ax, stats_passed
