@@ -1,8 +1,6 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from scipy.stats import fisher_exact, ranksums
-
 import pandas as pd
 
 def plot_per_base_sequence_content(df, end_position, title='', ax=None):
@@ -22,14 +20,13 @@ def plot_per_base_sequence_content(df, end_position, title='', ax=None):
 
     return ax
 
-def plot_per_base_sequence_comparison(pos_df, neg_df, end_position, title='', x_label='', ax=None, stats=False, p_value_thresh=0.01):
+def plot_per_base_sequence_comparison(pos_df, neg_df, end_position, title='', x_label='', ax=None, stats=None, p_value_thresh=0.01):
 
     bases = pos_df.columns[:-1].values
 
     if ax is None:
         fig, ax = plt.subplots(nrows=len(bases), ncols=1, figsize=(15, 3 * len(bases)), sharex=True, sharey=True)
 
-    stats_passed = True
     for index, base in enumerate(bases):
 
         pos_freq = pos_df[base][:end_position] / pos_df['sum'][:end_position]
@@ -45,12 +42,9 @@ def plot_per_base_sequence_comparison(pos_df, neg_df, end_position, title='', x_
 
         if stats:
             for i in range(len(pos_freq)):
-                table=[[pos_freq[i] * 100, (1 - pos_freq[i]) * 100],
-                    [neg_freq[i] * 100, (1 - neg_freq[i]) * 100]]
-            
-                _, p_value = fisher_exact(table=table) 
+                
+                p_value = stats[base][i]
                 if p_value < p_value_thresh:
-                    stats_passed = False
                     ax[index].plot(i, p_value, 'ro',)
 
                     # plot salmon background on position with p-value < 0.05
@@ -61,9 +55,9 @@ def plot_per_base_sequence_comparison(pos_df, neg_df, end_position, title='', x_
 
     ax[index].set_xlabel(x_label)
 
-    return ax, stats_passed
+    return ax
 
-def plot_composition_comparison(pos_df, neg_df, title='', x_label='', ax=None, stats=False, p_value_thresh=0.01):
+def plot_composition_comparison(pos_df, neg_df, title='', x_label='', ax=None, stats=None, p_value_thresh=0.01):
 
     # get bcolumns names
     bases = pos_df.columns.values
@@ -74,7 +68,7 @@ def plot_composition_comparison(pos_df, neg_df, title='', x_label='', ax=None, s
     if ax is None:
         fig, ax = plt.subplots(nrows=len(bases), ncols=1, figsize=(10, 2*len(bases)))
 
-    stats_passed = True
+    #stats_passed = True
     for index, base in enumerate(bases):
 
         pos_freq = pos_df[base] / pos_df['sum']
@@ -84,9 +78,8 @@ def plot_composition_comparison(pos_df, neg_df, title='', x_label='', ax=None, s
         sns.histplot(neg_freq, ax=ax[index], label='negative', kde=True, alpha=0.3)
 
         if stats:
-            _, p_value = ranksums(pos_freq, neg_freq)
+            p_value = stats.get(base, 0)
             if p_value < p_value_thresh:
-                stats_passed = False
                 ax[index].text(0.9, max( pos_df['sum'])/10, f"p-value: {p_value:.2e}", ha='center')
                 
                 # set frame to gray and width to 2
@@ -106,9 +99,9 @@ def plot_composition_comparison(pos_df, neg_df, title='', x_label='', ax=None, s
 
     ax[index].set_xlabel(x_label)
 
-    return ax, stats_passed
+    return ax
 
-def plot_composition_comparison_boxplot(pos_df, neg_df, title='', x_label='', ax=None, stats=False, p_value_thresh=0.01):
+def plot_composition_comparison_boxplot(pos_df, neg_df, title='', x_label='', ax=None, stats=None, p_value_thresh=0.01):
 
     bases = pos_df.columns[:-1].values
 
@@ -129,16 +122,16 @@ def plot_composition_comparison_boxplot(pos_df, neg_df, title='', x_label='', ax
     sns.boxplot(data=combined_df, x='base', y='frequency', hue='label', ax=ax)
 
     for base in bases:
-        pos_freq = pos_df[base] / pos_df['sum']
-        neg_freq = neg_df[base] / neg_df['sum']
 
-        _, p_value = ranksums(pos_freq, neg_freq)
-        if p_value < p_value_thresh:
-            # plot p-value on top of the boxplot
-            index = list(bases).index(base)
-            ax.text(index, -0.15, f"p-value: {p_value:.2e}", ha='center')
-            # set background of given column to salmon
-            ax.axvspan(index-0.48, index+0.48, facecolor='salmon', alpha=0.5)
+        if stats:
+            p_value = stats.get(base, 0)
+            if p_value < p_value_thresh:
+
+                # plot p-value on top of the boxplot
+                index = list(bases).index(base)
+                ax.text(index, -0.15, f"p-value: {p_value:.2e}", ha='center')
+                # set background of given column to salmon
+                ax.axvspan(index-0.48, index+0.48, facecolor='salmon', alpha=0.5)
 
     ax.set_title(title)
     ax.set_ylabel('Frequency')
@@ -147,7 +140,7 @@ def plot_composition_comparison_boxplot(pos_df, neg_df, title='', x_label='', ax
 
     return ax
 
-def plot_lenght_comparison(pos_df, neg_df, title='', x_label='', ax=None, stats=False, p_value_thresh=0.01):
+def plot_lenght_comparison(pos_df, neg_df, title='', x_label='', ax=None, stats=None, p_value_thresh=0.01):
 
     if ax is None:
         fig, ax = plt.subplots(1, ncols=1, figsize=(10, 2))
@@ -160,11 +153,9 @@ def plot_lenght_comparison(pos_df, neg_df, title='', x_label='', ax=None, stats=
     sns.histplot(pos_freq, ax=ax, label='positive', kde=True, alpha=0.2, bins=20)
     sns.histplot(neg_freq, ax=ax, label='negative', kde=True, alpha=0.2, bins=20)
 
-    stats_passed = True
     if stats:
-        _, p_value = ranksums(pos_freq, neg_freq)
+        p_value = stats
         if p_value < p_value_thresh:
-            stats_passed = False
             ax.text(0.9, 0.1, f"p-value: {p_value:.2e}", ha='center', transform=ax.transAxes)
             
             # set frame to gray and width to 2
@@ -181,6 +172,6 @@ def plot_lenght_comparison(pos_df, neg_df, title='', x_label='', ax=None, stats=
     ax.set_ylabel('Count')
     ax.legend()
 
-    ax.set_xlabel('Length')
+    ax.set_xlabel(x_label)
 
-    return ax, stats_passed
+    return ax
