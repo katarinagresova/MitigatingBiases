@@ -22,7 +22,10 @@ def plot_per_base_sequence_content(df, end_position, title='', ax=None):
 
 def plot_per_base_sequence_comparison(pos_df, neg_df, end_position, title='', x_label='', ax=None, stats=None, p_value_thresh=0.01):
 
-    bases = pos_df.columns[:-1].values
+    # get columns names
+    bases = pos_df.columns.values
+    # remove sum from bases (it doesn't have to be the last value)
+    bases = bases[bases != 'sum']
 
     if ax is None:
         fig, ax = plt.subplots(nrows=len(bases), ncols=1, figsize=(15, 3 * len(bases)), sharex=True, sharey=True)
@@ -103,7 +106,10 @@ def plot_composition_comparison(pos_df, neg_df, title='', x_label='', ax=None, s
 
 def plot_composition_comparison_boxplot(pos_df, neg_df, title='', x_label='', ax=None, stats=None, p_value_thresh=0.01):
 
-    bases = pos_df.columns[:-1].values
+    # get columns names
+    bases = pos_df.columns.values
+    # remove sum from bases (it doesn't have to be the last value)
+    bases = bases[bases != 'sum']
 
     if ax is None:
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(2 * len(bases), 5))

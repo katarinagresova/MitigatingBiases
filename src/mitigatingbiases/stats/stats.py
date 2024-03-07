@@ -52,6 +52,9 @@ def stats_per_base_sequence_comparison(pos_df, neg_df, end_position, p_value_thr
         # Correcting for FDR
         _, stats[base] = fdrcorrection(stats[base])
         # If there is no significant p-value, this test passed
+        # TODO: verify that this is a valid way to do correction
+        # maybe it should be done on all p-values
+        # or maybe per position
         passed = passed and np.all(np.array(stats[base]) > p_value_thresh)
 
     return (stats, passed)

@@ -14,7 +14,7 @@ def parse_fasta(filename):
 
     with open(filename, "r") as handle:
         for record in SeqIO.parse(handle, "fasta"):
-            yield record.seq
+            yield record.seq.upper()
 
 def print_passed(stats):
     # Print stats. Failed in red and passed in green
@@ -46,13 +46,18 @@ def get_plots(
     neg_nucleotides_per_position_df,
     pos_nucleotides_per_position_reversed_df,
     neg_nucleotides_per_position_reversed_df,
-    p_value_thresh=0.001,
+    p_value_thresh=0.01,
     stats=None
 ):
     plots = []
 
+    # get bcolumns names
+    bases = pos_nucleotides_df.columns.values
+    # remove sum from bases (it doesn't have to be the last value)
+    bases = bases[bases != 'sum']
+
     # Plot nucleotides
-    fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(10, 8))
+    fig, ax = plt.subplots(nrows=len(bases), ncols=1, figsize=(10, 2*len(bases)))
     plot_composition_comparison(
         pos_nucleotides_df,
         neg_nucleotides_df,
@@ -63,8 +68,13 @@ def get_plots(
     fig.suptitle('Nucleotide composition')
     plots.append(fig)
 
+    # get bcolumns names
+    bases = pos_dinucleotides_df.columns.values
+    # remove sum from bases (it doesn't have to be the last value)
+    bases = bases[bases != 'sum']
+
     # Plot dinucleotides
-    fig, ax = plt.subplots(nrows=16, ncols=1, figsize=(10, 32))
+    fig, ax = plt.subplots(nrows=len(bases), ncols=1, figsize=(10, 2*len(bases)))
     plot_composition_comparison(
         pos_dinucleotides_df,
         neg_dinucleotides_df,
@@ -75,8 +85,13 @@ def get_plots(
     fig.suptitle('Dinucleotide composition')
     plots.append(fig)
 
+    # get columns names
+    bases = pos_nucleotides_per_position_df.columns.values
+    # remove sum from bases (it doesn't have to be the last value)
+    bases = bases[bases != 'sum']
+
     # Plot nucleotides per position
-    fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(10, 8))
+    fig, ax = plt.subplots(nrows=len(bases), ncols=1, figsize=(10, 2*len(bases)))
     plot_per_base_sequence_comparison(
         pos_nucleotides_per_position_df, 
         neg_nucleotides_per_position_df, 
@@ -88,8 +103,13 @@ def get_plots(
     fig.suptitle('Nucleotide per position')
     plots.append(fig)
 
+    # get columns names
+    bases = pos_nucleotides_per_position_reversed_df.columns.values
+    # remove sum from bases (it doesn't have to be the last value)
+    bases = bases[bases != 'sum']
+
     # Plot nucleotides per position reversed
-    fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(10, 8))
+    fig, ax = plt.subplots(nrows=len(bases), ncols=1, figsize=(10, 2 * len(bases)))
     plot_per_base_sequence_comparison(
         pos_nucleotides_per_position_reversed_df, 
         neg_nucleotides_per_position_reversed_df, 
@@ -123,7 +143,8 @@ def get_stats(
     pos_nucleotides_per_position_df,
     neg_nucleotides_per_position_df,
     pos_nucleotides_per_position_reversed_df,
-    neg_nucleotides_per_position_reversed_df
+    neg_nucleotides_per_position_reversed_df,
+    p_value_thresh=0.01
 ):
     stats = {}
     passed = {}
@@ -131,26 +152,31 @@ def get_stats(
     stats['Nucleotide composition'], passed['Nucleotide composition'] = stats_composition_comparison(
         pos_nucleotides_df,
         neg_nucleotides_df,
-        end_position=100
+        end_position=100,
+        p_value_thresh=p_value_thresh
     )
     stats['Dinucleotide composition'], passed['Dinucleotide composition'] = stats_composition_comparison(
         pos_dinucleotides_df,
         neg_dinucleotides_df,
-        end_position=100
+        end_position=100,
+        p_value_thresh=p_value_thresh
     )
     stats['Nucleotide per position'], passed['Nucleotide per position'] = stats_per_base_sequence_comparison(
         pos_nucleotides_per_position_df,
         neg_nucleotides_per_position_df,
-        end_position=100
+        end_position=100,
+        p_value_thresh=p_value_thresh
     )
     stats['Nucleotide per position reversed'], passed['Nucleotide per position reversed'] = stats_per_base_sequence_comparison(
         pos_nucleotides_per_position_reversed_df,
         neg_nucleotides_per_position_reversed_df,
-        end_position=100
+        end_position=100,
+        p_value_thresh=p_value_thresh
     )
     stats['Length distribution'], passed['Length distribution'] = stats_lenght_comparison(
         pos_nucleotides_df['sum'],
-        neg_nucleotides_df['sum']
+        neg_nucleotides_df['sum'],
+        p_value_thresh=p_value_thresh
     )
 
     return stats, passed
@@ -186,7 +212,8 @@ def main():
         neg_nucleotides_per_position_df,
         pos_nucleotides_per_position_reversed_df,
         neg_nucleotides_per_position_reversed_df,
-        stats=stats
+        stats=stats,
+        p_value_thresh=args.p_value_thresh
     )
 
     print_passed(passed)
