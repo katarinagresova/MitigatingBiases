@@ -5,7 +5,7 @@
 Clone this repository
 
 ```bash
-git clone git@github.com:katarinagresova/MitigatingBiases.git
+git clone https://github.com/katarinagresova/MitigatingBiases.git
 ```
 
 Switch to the directory
